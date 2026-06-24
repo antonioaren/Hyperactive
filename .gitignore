@@ -1,0 +1,32 @@
+# Local agent/tool config
+.atl/
+.claude/
+
+# macOS
+.DS_Store
+
+# Xcode / Swift build artifacts
+build/
+DerivedData/
+*.xcuserdata/
+*.xcuserstate
+*.xcarchive
+*.dSYM
+.swiftpm/
+
+# Distribution artifacts
+*.dmg
+*.zip
+
+# Local env/secrets
+.env
+.env.*
+*.pem
+*.p8
+*.key
+*.mobileprovision
+
+# Logs / temp
+*.log
+.tmp/
+tmp/
