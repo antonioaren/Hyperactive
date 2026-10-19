@@ -12,6 +12,7 @@ struct MenuBarView: View {
         .keyboardShortcut("s")
         .onAppear {
             appState.refreshAccessibility()
+            appState.refreshDisplays()
         }
 
         Divider()
@@ -59,11 +60,33 @@ struct MenuBarView: View {
 
         Divider()
 
+        Toggle("Keep Awake with Lid Closed", isOn: Binding(
+            get: { appState.keepAwakeWithLidClosed },
+            set: { appState.setKeepAwakeWithLidClosed($0) }
+        ))
+
+        Text(appState.closedLidStatusText)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        Text(AppState.closedLidHeatWarning)
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+
+        if let closedLidMessage = appState.closedLidMessage {
+            Text(closedLidMessage)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+
+        Divider()
+
         Button("About Hyperactive") {
             NSApplication.shared.orderFrontStandardAboutPanel()
         }
 
         Button("Quit") {
+            appState.prepareForTermination()
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")

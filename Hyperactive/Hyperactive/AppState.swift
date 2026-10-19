@@ -9,9 +9,17 @@ final class AppState {
     var lastNudgeTime: Date?
     var hasAccessibility = false
     var launchAtLogin = false
+    var keepAwakeWithLidClosed = false
+    var hasExternalDisplay = false
+    var closedLidMessage: String?
 
     private var timer: DispatchSourceTimer?
     private let timerQueue = DispatchQueue(label: "com.hyperactive.timer", qos: .utility)
+    private let closedLidKeepAwake = ClosedLidKeepAwake()
+    private var didPrepareForTermination = false
+    private var isTerminating = false
+
+    static let closedLidHeatWarning = "Runs hot with the lid closed. Don't put the Mac in a bag. If sleep stays disabled, run sudo pmset -a disablesleep 0"
 
     var menuBarIcon: String {
         isActive ? "cursorarrow.motionlines" : "cursorarrow"
@@ -30,9 +38,28 @@ final class AppState {
         return "Inactive"
     }
 
+    var closedLidStatusText: String {
+        if hasExternalDisplay {
+            return "External display connected — macOS can already stay awake with the lid closed."
+        }
+        return "No external display — closing the lid would normally sleep this Mac."
+    }
+
     init() {
         hasAccessibility = AccessibilityHelper.isTrusted()
         launchAtLogin = LaunchAtLoginHelper.isEnabled
+        hasExternalDisplay = closedLidKeepAwake.hasExternalDisplay
+        closedLidKeepAwake.onDisplaysChanged = { [weak self] in
+            guard let self else { return }
+            self.hasExternalDisplay = self.closedLidKeepAwake.hasExternalDisplay
+        }
+        AppDelegate.terminationHandler = { [weak self] in
+            self?.prepareForTermination()
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.resumeClosedLidIfNeeded()
+        }
 
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
@@ -99,6 +126,51 @@ final class AppState {
     func stop() {
         isActive = false
         stopTimer()
+    }
+
+    func refreshDisplays() {
+        closedLidKeepAwake.refreshDisplays()
+        hasExternalDisplay = closedLidKeepAwake.hasExternalDisplay
+    }
+
+    func setKeepAwakeWithLidClosed(_ enabled: Bool) {
+        guard !isTerminating else { return }
+        closedLidMessage = nil
+        if enabled == keepAwakeWithLidClosed { return }
+
+        if enabled {
+            if closedLidKeepAwake.arm() {
+                keepAwakeWithLidClosed = true
+            } else {
+                keepAwakeWithLidClosed = false
+                closedLidMessage = "Sleep settings were not changed. Administrator permission is required."
+            }
+            return
+        }
+
+        if closedLidKeepAwake.disarm() {
+            keepAwakeWithLidClosed = false
+        } else {
+            keepAwakeWithLidClosed = true
+            closedLidMessage = "Sleep settings were not changed. Administrator permission is required."
+        }
+    }
+
+    /// Restores normal sleep on quit. Safe to call more than once.
+    func prepareForTermination() {
+        guard !didPrepareForTermination else { return }
+        didPrepareForTermination = true
+        isTerminating = true
+        closedLidKeepAwake.disarmForTermination()
+    }
+
+    private func resumeClosedLidIfNeeded() {
+        guard !isTerminating else { return }
+        let result = closedLidKeepAwake.resumeFromPreviousLaunch()
+        keepAwakeWithLidClosed = closedLidKeepAwake.isArmed
+        if result == .needsAdministrator {
+            closedLidMessage = "Sleep settings were not changed. Administrator permission is required."
+        }
     }
 
     func updateInterval(_ minutes: Int) {
