@@ -117,7 +117,7 @@ final class ClosedLidKeepAwake {
         guard !holdsAssertion else { return }
         var newID: IOPMAssertionID = 0
         let result = IOPMAssertionCreateWithName(
-            kIOPMAssertionTypePreventUserIdleDisplaySleep,
+            kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
             IOPMAssertionLevel(kIOPMAssertionLevelOn),
             "Hyperactive keeps the display on with the lid closed" as CFString,
             &newID
