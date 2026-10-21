@@ -14,6 +14,7 @@
 		AA000001000000000000001E /* LaunchAtLoginHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000A5 /* LaunchAtLoginHelper.swift */; };
 		AA000001000000000000001F /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000A6 /* MenuBarView.swift */; };
 		AA0000010000000000000020 /* ClosedLidKeepAwake.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000AA /* ClosedLidKeepAwake.swift */; };
+		AA0000010000000000000022 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000AC /* UpdateChecker.swift */; };
 		AA0000010000000000000021 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000AB /* IOKit.framework */; };
 		AA00000100000000000000B1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000A7 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -26,6 +27,7 @@
 		AA00000100000000000000A5 /* LaunchAtLoginHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginHelper.swift; sourceTree = "<group>"; };
 		AA00000100000000000000A6 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		AA00000100000000000000AA /* ClosedLidKeepAwake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClosedLidKeepAwake.swift; sourceTree = "<group>"; };
+		AA00000100000000000000AC /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		AA00000100000000000000AB /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		AA00000100000000000000A7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA00000100000000000000A8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -63,6 +65,7 @@
 				AA00000100000000000000A4 /* AccessibilityHelper.swift */,
 				AA00000100000000000000A5 /* LaunchAtLoginHelper.swift */,
 				AA00000100000000000000AA /* ClosedLidKeepAwake.swift */,
+				AA00000100000000000000AC /* UpdateChecker.swift */,
 				AA00000100000000000000A6 /* MenuBarView.swift */,
 				AA00000100000000000000A7 /* Assets.xcassets */,
 				AA00000100000000000000A8 /* Info.plist */,
@@ -162,6 +165,7 @@
 				AA000001000000000000001D /* AccessibilityHelper.swift in Sources */,
 				AA000001000000000000001E /* LaunchAtLoginHelper.swift in Sources */,
 				AA0000010000000000000020 /* ClosedLidKeepAwake.swift in Sources */,
+				AA0000010000000000000022 /* UpdateChecker.swift in Sources */,
 				AA000001000000000000001F /* MenuBarView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -305,7 +309,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",
@@ -338,7 +342,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",
