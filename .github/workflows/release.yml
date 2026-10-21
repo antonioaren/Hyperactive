@@ -1,0 +1,140 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'release' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: Build macOS app
+    runs-on: macos-15
+    env:
+      APP_PATH: build/Build/Products/Release/Hyperactive.app
+      # Optional. When set, the app is signed with Developer ID (and notarized
+      # if the Apple ID secrets are also set). Otherwise it is ad-hoc signed.
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          next="$(scripts/next-version.sh)"
+          publish=false
+          if [[ "$GITHUB_EVENT_NAME" != "pull_request" && "$GITHUB_REF" == "refs/heads/main" && -n "$next" ]]; then
+            publish=true
+          fi
+          if [[ -z "$next" ]]; then
+            next="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null | sed 's/^v//' || true)"
+            next="${next:-1.0.0}"
+          fi
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "### Hyperactive v$next (publish: $publish)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Build
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: make release VERSION="$VERSION" BUILD_NUMBER="$GITHUB_RUN_NUMBER"
+
+      - name: Sign with Developer ID
+        if: env.MACOS_CERTIFICATE != ''
+        env:
+          KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          rm -f "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
+          # shellcheck disable=SC2046
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity="$(security find-identity -v -p codesigning "$keychain" | grep -o '"Developer ID Application: [^"]*"' | head -n 1 | tr -d '"')"
+          if [[ -z "$identity" ]]; then
+            echo "No 'Developer ID Application' identity found in MACOS_CERTIFICATE" >&2
+            exit 1
+          fi
+          codesign --force --options runtime --timestamp \
+            --entitlements Hyperactive/Hyperactive/Hyperactive.entitlements \
+            --sign "$identity" "$APP_PATH"
+
+      - name: Notarize
+        if: env.MACOS_CERTIFICATE != '' && env.APPLE_ID != ''
+        run: |
+          ditto -c -k --keepParent "$APP_PATH" "$RUNNER_TEMP/notarize.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/notarize.zip" \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple "$APP_PATH"
+
+      - name: Verify app
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          archs="$(lipo -archs "$APP_PATH/Contents/MacOS/Hyperactive")"
+          echo "Architectures: $archs"
+          [[ "$archs" == *arm64* && "$archs" == *x86_64* ]]
+          actual="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Contents/Info.plist")"
+          echo "Bundle version: $actual"
+          [[ "$actual" == "$VERSION" ]]
+
+      - name: Package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          make package source-zip VERSION="$VERSION"
+          ls -lh build/dist
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hyperactive-${{ steps.version.outputs.version }}
+          path: build/dist/*
+          if-no-files-found: error
+
+      - name: Generate release notes
+        if: steps.version.outputs.publish == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          scripts/release-notes.sh "$VERSION" "$GITHUB_REPOSITORY" > "$RUNNER_TEMP/release-notes.md"
+          cat "$RUNNER_TEMP/release-notes.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish GitHub release
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" build/dist/* \
+            --target "$GITHUB_SHA" \
+            --title "Hyperactive v$VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --latest
+
+      - name: Remove signing keychain
+        if: always() && env.MACOS_CERTIFICATE != ''
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true

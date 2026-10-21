@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @Bindable var appState: AppState
+    var updateChecker: UpdateChecker
 
     private static let intervals = [1, 2, 5, 10, 15, 30]
 
@@ -81,6 +82,14 @@ struct MenuBarView: View {
 
         Divider()
 
+        Text(AppVersion.installedDescription)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        updateSection
+
+        Divider()
+
         Button("About Hyperactive") {
             NSApplication.shared.orderFrontStandardAboutPanel()
         }
@@ -90,5 +99,44 @@ struct MenuBarView: View {
             NSApplication.shared.terminate(nil)
         }
         .keyboardShortcut("q")
+    }
+
+    @ViewBuilder
+    private var updateSection: some View {
+        switch updateChecker.state {
+        case .checking:
+            Text("Checking for updates\u{2026}")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .installing:
+            Text("Downloading and installing update\u{2026}")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        case .idle, .upToDate, .updateAvailable, .failed:
+            if let release = updateChecker.availableRelease {
+                Button("Update to v\(release.version.description)") {
+                    updateChecker.installUpdate(beforeRelaunch: appState.prepareForTermination)
+                }
+            } else {
+                Button("Check for Updates\u{2026}") {
+                    updateChecker.checkForUpdates(userInitiated: true)
+                }
+            }
+
+            if updateChecker.state == .upToDate {
+                Text("Hyperactive is up to date")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            if case .failed(let message) = updateChecker.state {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Button("Open Releases Page\u{2026}") {
+                    updateChecker.openReleasesPage()
+                }
+            }
+        }
     }
 }
