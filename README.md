@@ -15,6 +15,7 @@ Hyperactive sits in your menu bar and moves the mouse cursor by a few pixels (±
 - **Configurable interval** — 1, 2, 5, 10, 15, or 30 minutes
 - **Nudge counter** — see how many nudges have occurred and when
 - **Launch at Login** — start automatically with macOS
+- **Keep awake with the lid closed** — stays awake with no external display, so a local AI job keeps running
 - **Invisible** — no Dock icon, no Cmd-Tab entry
 - **Lightweight** — native Swift, ~3 MB, negligible CPU
 
@@ -58,6 +59,14 @@ On first launch (or when you click "Start"), macOS will prompt you to grant acce
 
 If you miss the prompt, click **"Grant Accessibility Access..."** in the app's menu.
 
+**Keep Awake with Lid Closed** also needs an administrator password. macOS sleeps a laptop immediately when the lid closes and no external display is attached; cursor nudges cannot block that. The menu item runs `pmset -a disablesleep` and restores normal sleep when you turn it off or quit. The built-in panel turns off with the lid. The Mac, and anything running on it, stays awake.
+
+That runs hot. Don't put the Mac in a bag. If the app quits uncleanly and the Mac never sleeps again, run:
+
+```bash
+sudo pmset -a disablesleep 0
+```
+
 ## Usage
 
 1. Click the cursor icon in the menu bar
@@ -65,6 +74,7 @@ If you miss the prompt, click **"Grant Accessibility Access..."** in the app's m
 3. The mouse will nudge every 5 minutes (default)
 4. To change the interval: **Interval >** submenu
 5. Click **Stop** to deactivate
+6. To keep a local job running with the lid shut and no external display, turn on **Keep Awake with Lid Closed** before you close the lid, then enter your password
 
 ## Menu
 
@@ -76,6 +86,10 @@ Active — 12 nudges (last: 2:34 PM)
 Interval ▸ [1, 2, 5✓, 10, 15, 30 min]
 ─────────────────────────────
 ☑ Launch at Login
+─────────────────────────────
+☐ Keep Awake with Lid Closed
+No external display — closing the lid would normally sleep this Mac.
+Runs hot with the lid closed. Don't put the Mac in a bag.
 ─────────────────────────────
 About Hyperactive
 Quit                      ⌘Q
