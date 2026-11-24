@@ -11,6 +11,7 @@ struct HyperactiveApp: App {
             MenuBarView(appState: appState, updateChecker: updateChecker)
         } label: {
             Image(systemName: appState.menuBarIcon)
+                .help(appState.statusText)
         }
         .menuBarExtraStyle(.menu)
     }

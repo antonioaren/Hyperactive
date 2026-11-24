@@ -12,13 +12,24 @@ struct MenuBarView: View {
         }
         .keyboardShortcut("s")
         .onAppear {
-            appState.refreshAccessibility()
-            appState.refreshDisplays()
+            appState.refreshForMenu()
         }
 
         Divider()
 
         Text(appState.statusText)
+
+        if let caption = appState.snoozeOutsideCaption {
+            Text(caption)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
+        if appState.showsClosedLidDuringSnooze {
+            Text("Lid-closed keep-awake is still on, so this Mac will not sleep.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
 
         if !appState.hasAccessibility {
             Text("Accessibility: not granted")
@@ -29,6 +40,47 @@ struct MenuBarView: View {
                 .foregroundStyle(.secondary)
             Button("Open Accessibility Settings\u{2026}") {
                 AccessibilityHelper.openAccessibilitySettings()
+            }
+        }
+
+        Divider()
+
+        Menu("Snooze") {
+            Button(appState.settings.enabled ? "Turn Snooze Off" : "Turn Snooze On") {
+                appState.setSnoozeEnabled(!appState.settings.enabled)
+            }
+            Button {
+                appState.setOutsideMode(.off)
+            } label: {
+                HStack {
+                    Text("Outside Hours: Off")
+                    if appState.settings.outsideMode == .off {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+            Button {
+                appState.setOutsideMode(.screenOnly)
+            } label: {
+                HStack {
+                    Text("Outside Hours: Screen Only")
+                    if appState.settings.outsideMode == .screenOnly {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+            Button {
+                appState.setWeekdaysOnly(!appState.settings.weekdaysOnly)
+            } label: {
+                HStack {
+                    Text("Weekdays Only")
+                    if appState.settings.weekdaysOnly {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+            Button("Edit Schedule\u{2026}") {
+                appState.editSnoozeSchedule()
             }
         }
 

@@ -21,12 +21,17 @@ DMG_NAME = Hyperactive-$(VERSION_LABEL).dmg
 APP_ZIP_NAME = Hyperactive-$(VERSION_LABEL)-macOS.zip
 SOURCE_ZIP_NAME = Hyperactive-$(VERSION_LABEL)-source.zip
 
-.PHONY: build release clean archive dmg zip package package-dmg package-zip source-zip version open
+.PHONY: build release test clean archive dmg zip package package-dmg package-zip source-zip version open
 
 # Debug build
 build:
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(CONFIG_DEBUG) \
 		-derivedDataPath $(BUILD_DIR) $(VERSION_FLAGS) build
+
+# Schedule unit tests. They do not move the pointer or change sleep settings.
+test:
+	xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration $(CONFIG_DEBUG) \
+		-derivedDataPath $(BUILD_DIR) -destination 'platform=macOS' test
 
 # Release build (universal: Apple silicon + Intel)
 release:

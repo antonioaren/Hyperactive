@@ -15,6 +15,11 @@
 		AA000001000000000000001F /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000A6 /* MenuBarView.swift */; };
 		AA0000010000000000000020 /* ClosedLidKeepAwake.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000AA /* ClosedLidKeepAwake.swift */; };
 		AA0000010000000000000022 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000AC /* UpdateChecker.swift */; };
+		AA0000010000000000000030 /* SnoozeSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000B2 /* SnoozeSchedule.swift */; };
+		AA0000010000000000000031 /* DisplaySleepAssertion.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000B3 /* DisplaySleepAssertion.swift */; };
+		AA0000010000000000000032 /* SnoozeEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000B4 /* SnoozeEditor.swift */; };
+		AA0000010000000000000033 /* SnoozeSchedule.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000B2 /* SnoozeSchedule.swift */; };
+		AA0000010000000000000034 /* SnoozeScheduleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000B5 /* SnoozeScheduleTests.swift */; };
 		AA0000010000000000000021 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000AB /* IOKit.framework */; };
 		AA00000100000000000000B1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA00000100000000000000A7 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -28,6 +33,11 @@
 		AA00000100000000000000A6 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		AA00000100000000000000AA /* ClosedLidKeepAwake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClosedLidKeepAwake.swift; sourceTree = "<group>"; };
 		AA00000100000000000000AC /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
+		AA00000100000000000000B2 /* SnoozeSchedule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoozeSchedule.swift; sourceTree = "<group>"; };
+		AA00000100000000000000B3 /* DisplaySleepAssertion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplaySleepAssertion.swift; sourceTree = "<group>"; };
+		AA00000100000000000000B4 /* SnoozeEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoozeEditor.swift; sourceTree = "<group>"; };
+		AA00000100000000000000B5 /* SnoozeScheduleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnoozeScheduleTests.swift; sourceTree = "<group>"; };
+		AA00000100000000000000F2 /* HyperactiveTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HyperactiveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA00000100000000000000AB /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
 		AA00000100000000000000A7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA00000100000000000000A8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -44,6 +54,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA00000100000000000000C5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -51,6 +68,7 @@
 			isa = PBXGroup;
 			children = (
 				AA00000100000000000000D2 /* Hyperactive */,
+				AA00000100000000000000D5 /* HyperactiveTests */,
 				AA00000100000000000000D4 /* Frameworks */,
 				AA00000100000000000000D3 /* Products */,
 			);
@@ -66,6 +84,9 @@
 				AA00000100000000000000A5 /* LaunchAtLoginHelper.swift */,
 				AA00000100000000000000AA /* ClosedLidKeepAwake.swift */,
 				AA00000100000000000000AC /* UpdateChecker.swift */,
+				AA00000100000000000000B2 /* SnoozeSchedule.swift */,
+				AA00000100000000000000B3 /* DisplaySleepAssertion.swift */,
+				AA00000100000000000000B4 /* SnoozeEditor.swift */,
 				AA00000100000000000000A6 /* MenuBarView.swift */,
 				AA00000100000000000000A7 /* Assets.xcassets */,
 				AA00000100000000000000A8 /* Info.plist */,
@@ -82,10 +103,19 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		AA00000100000000000000D5 /* HyperactiveTests */ = {
+			isa = PBXGroup;
+			children = (
+				AA00000100000000000000B5 /* SnoozeScheduleTests.swift */,
+			);
+			path = HyperactiveTests;
+			sourceTree = "<group>";
+		};
 		AA00000100000000000000D3 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				AA00000100000000000000F1 /* Hyperactive.app */,
+				AA00000100000000000000F2 /* HyperactiveTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -109,6 +139,22 @@
 			productName = Hyperactive;
 			productReference = AA00000100000000000000F1 /* Hyperactive.app */;
 			productType = "com.apple.product-type.application";
+		};
+		AA00000100000000000000E2 /* HyperactiveTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA00000100000000000000EC /* Build configuration list for PBXNativeTarget "HyperactiveTests" */;
+			buildPhases = (
+				AA00000100000000000000C4 /* Sources */,
+				AA00000100000000000000C5 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = HyperactiveTests;
+			productName = HyperactiveTests;
+			productReference = AA00000100000000000000F2 /* HyperactiveTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -139,6 +185,7 @@
 			projectRoot = "";
 			targets = (
 				AA00000100000000000000E1 /* Hyperactive */,
+				AA00000100000000000000E2 /* HyperactiveTests */,
 			);
 		};
 /* End PBXProject section */
@@ -167,6 +214,18 @@
 				AA0000010000000000000020 /* ClosedLidKeepAwake.swift in Sources */,
 				AA0000010000000000000022 /* UpdateChecker.swift in Sources */,
 				AA000001000000000000001F /* MenuBarView.swift in Sources */,
+				AA0000010000000000000030 /* SnoozeSchedule.swift in Sources */,
+				AA0000010000000000000031 /* DisplaySleepAssertion.swift in Sources */,
+				AA0000010000000000000032 /* SnoozeEditor.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA00000100000000000000C4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000010000000000000033 /* SnoozeSchedule.swift in Sources */,
+				AA0000010000000000000034 /* SnoozeScheduleTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -355,6 +414,66 @@
 			};
 			name = Release;
 		};
+		AA00000100000000000000EA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(DEVELOPER_FRAMEWORKS_DIR)",
+					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					"XCTest",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hyperactive.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AA00000100000000000000EB /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(DEVELOPER_FRAMEWORKS_DIR)",
+					"$(PLATFORM_DIR)/Developer/Library/Frameworks",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					"XCTest",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.hyperactive.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -372,6 +491,15 @@
 			buildConfigurations = (
 				AA00000100000000000000E8 /* Debug */,
 				AA00000100000000000000E9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA00000100000000000000EC /* Build configuration list for PBXNativeTarget "HyperactiveTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA00000100000000000000EA /* Debug */,
+				AA00000100000000000000EB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

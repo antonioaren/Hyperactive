@@ -12,30 +12,67 @@ final class AppState {
     var keepAwakeWithLidClosed = false
     var hasExternalDisplay = false
     var closedLidMessage: String?
+    private(set) var settings = SnoozeSettings.disabled
 
     private var timer: DispatchSourceTimer?
+    private var boundaryTimer: DispatchSourceTimer?
     private let timerQueue = DispatchQueue(label: "com.hyperactive.timer", qos: .utility)
     private let closedLidKeepAwake = ClosedLidKeepAwake()
+    private let displayAssertion = DisplaySleepAssertion()
     private var didPrepareForTermination = false
     private var isTerminating = false
+    private var appliedActivity: Activity = .idle
+    private var override: ManualOverride?
+    private var lastDecision = SnoozeDecision(activity: .idle, override: nil, nextChange: nil)
+    private var workspaceObservers: [NSObjectProtocol] = []
+    private var notificationObservers: [NSObjectProtocol] = []
 
     static let closedLidHeatWarning = "Runs hot with the lid closed. Don't put the Mac in a bag. If sleep stays disabled, run sudo pmset -a disablesleep 0"
 
     var menuBarIcon: String {
-        isActive ? "cursorarrow.motionlines" : "cursorarrow"
+        SnoozeSchedule.symbol(
+            nudging: isActive,
+            snoozeEnabled: settings.enabled,
+            showingDisplay: appliedActivity == .display,
+            paused: isPaused,
+            blocked: accessibilityBlocked
+        )
     }
 
     var statusText: String {
-        if isActive {
-            var text = "Active — \(nudgeCount) nudge\(nudgeCount == 1 ? "" : "s")"
-            if let last = lastNudgeTime {
-                let formatter = DateFormatter()
-                formatter.timeStyle = .short
-                text += " (last: \(formatter.string(from: last)))"
+        if !settings.enabled {
+            if isActive {
+                var text = "Active — \(nudgeCount) nudge\(nudgeCount == 1 ? "" : "s")"
+                if let last = lastNudgeTime {
+                    text += " (last: \(Self.shortTime(last)))"
+                }
+                return text
             }
-            return text
+            return "Inactive"
         }
-        return "Inactive"
+        return SnoozeSchedule.statusLine(
+            now: Date(),
+            calendar: .current,
+            decision: lastDecision,
+            nudgeCount: nudgeCount,
+            lastNudge: lastNudgeTime,
+            accessibilityBlocked: accessibilityBlocked,
+            locale: .current
+        )
+    }
+
+    var snoozeOutsideCaption: String? {
+        guard settings.enabled, !isActive, !isPaused, !accessibilityBlocked else { return nil }
+        switch settings.outsideMode {
+        case .off:
+            return "Outside active hours, Hyperactive does nothing."
+        case .screenOnly:
+            return "Outside active hours, the display stays on and the pointer stays still."
+        }
+    }
+
+    var showsClosedLidDuringSnooze: Bool {
+        settings.enabled && keepAwakeWithLidClosed && !isActive
     }
 
     var closedLidStatusText: String {
@@ -45,7 +82,17 @@ final class AppState {
         return "No external display — closing the lid would normally sleep this Mac."
     }
 
+    private var isPaused: Bool {
+        if case .forceIdle = override { return true }
+        return false
+    }
+
+    private var accessibilityBlocked: Bool {
+        settings.enabled && !hasAccessibility && lastDecision.activity == .nudge && !isActive
+    }
+
     init() {
+        settings = SnoozeSettings.load()
         hasAccessibility = AccessibilityHelper.isTrusted()
         launchAtLogin = LaunchAtLoginHelper.isEnabled
         hasExternalDisplay = closedLidKeepAwake.hasExternalDisplay
@@ -57,43 +104,89 @@ final class AppState {
             self?.prepareForTermination()
         }
 
+        workspaceObservers.append(
+            NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.handleWake()
+            }
+        )
+        observeClockChanges()
+
         DispatchQueue.main.async { [weak self] in
             self?.resumeClosedLidIfNeeded()
         }
 
-        NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self, self.isActive else { return }
-            self.restartTimer()
+        if settings.enabled {
+            reconcile(restartNudgeTimer: false, userInitiated: false)
         }
     }
 
-    /// Re-check accessibility status when the menu opens
+    deinit {
+        for observer in workspaceObservers {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        for observer in notificationObservers {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        timer?.cancel()
+        boundaryTimer?.cancel()
+        displayAssertion.release()
+    }
+
+    /// Re-check accessibility status when the menu opens.
     func refreshAccessibility() {
         hasAccessibility = AccessibilityHelper.isTrusted()
     }
 
+    func refreshForMenu() {
+        refreshAccessibility()
+        refreshDisplays()
+        guard settings.enabled, !isTerminating else { return }
+        reconcile(restartNudgeTimer: false, userInitiated: false)
+    }
+
     func toggle() {
-        if isActive {
-            stop()
-        } else {
-            start()
+        guard !isTerminating else { return }
+        if !settings.enabled {
+            if isActive {
+                stop()
+            } else {
+                start()
+            }
+            return
         }
+        if isActive {
+            if case .forceNudge = override {
+                override = nil
+            } else {
+                override = .forceIdle
+            }
+        } else if case .forceIdle = override {
+            override = nil
+        } else {
+            let parts = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+            if let year = parts.year, let month = parts.month, let day = parts.day {
+                override = .forceNudge(year: year, month: month, day: day)
+            }
+        }
+        reconcile(restartNudgeTimer: false, userInitiated: true)
     }
 
     func start() {
         guard AccessibilityHelper.isTrusted() else {
             hasAccessibility = false
             AccessibilityHelper.requestAccess()
-            // Poll for permission grant (e.g. user toggled it off/on after rebuild)
             startAccessibilityPolling()
             return
         }
         hasAccessibility = true
         isActive = true
+        appliedActivity = .nudge
+        displayAssertion.release()
+        cancelBoundaryTimer()
         startTimer()
     }
 
@@ -109,14 +202,18 @@ final class AppState {
                 self.accessibilityPollTimer?.cancel()
                 self.accessibilityPollTimer = nil
                 self.hasAccessibility = true
-                self.isActive = true
-                self.startTimer()
+                if self.settings.enabled {
+                    self.reconcile(restartNudgeTimer: true, userInitiated: true)
+                } else {
+                    self.isActive = true
+                    self.appliedActivity = .nudge
+                    self.startTimer()
+                }
             }
         }
         poll.resume()
         accessibilityPollTimer = poll
 
-        // Stop polling after 60 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
             self?.accessibilityPollTimer?.cancel()
             self?.accessibilityPollTimer = nil
@@ -125,7 +222,12 @@ final class AppState {
 
     func stop() {
         isActive = false
+        appliedActivity = .idle
         stopTimer()
+        displayAssertion.release()
+        if !settings.enabled {
+            cancelBoundaryTimer()
+        }
     }
 
     func refreshDisplays() {
@@ -161,7 +263,105 @@ final class AppState {
         guard !didPrepareForTermination else { return }
         didPrepareForTermination = true
         isTerminating = true
+        stopTimer()
+        cancelBoundaryTimer()
+        accessibilityPollTimer?.cancel()
+        accessibilityPollTimer = nil
+        displayAssertion.release()
         closedLidKeepAwake.disarmForTermination()
+    }
+
+    func setSnoozeEnabled(_ enabled: Bool) {
+        guard !isTerminating else { return }
+        if enabled == settings.enabled { return }
+        if !enabled {
+            disableSnooze()
+            return
+        }
+        if settings.hasEffectiveWindow {
+            settings.enabled = true
+            override = nil
+            persistSnooze()
+            reconcile(restartNudgeTimer: false, userInitiated: false)
+            return
+        }
+        SnoozeEditorPresenter.shared.show(
+            draft: settings.seededForFirstEnable(),
+            enableOnDone: true
+        ) { [weak self] edited in
+            self?.commitSnoozeEdit(edited, enableOnDone: true)
+        }
+    }
+
+    func setOutsideMode(_ mode: OutsideMode) {
+        guard !isTerminating else { return }
+        guard settings.outsideMode != mode else { return }
+        settings.outsideMode = mode
+        persistSnooze()
+        if settings.enabled {
+            reconcile(restartNudgeTimer: false, userInitiated: false)
+        }
+    }
+
+    func setWeekdaysOnly(_ enabled: Bool) {
+        guard !isTerminating else { return }
+        guard settings.weekdaysOnly != enabled else { return }
+        settings.weekdaysOnly = enabled
+        persistSnooze()
+        if settings.enabled {
+            reconcile(restartNudgeTimer: false, userInitiated: false)
+        }
+    }
+
+    func editSnoozeSchedule() {
+        guard !isTerminating else { return }
+        SnoozeEditorPresenter.shared.show(draft: settings, enableOnDone: false) { [weak self] edited in
+            self?.commitSnoozeEdit(edited, enableOnDone: false)
+        }
+    }
+
+    func updateInterval(_ minutes: Int) {
+        intervalMinutes = minutes
+        if isActive {
+            restartTimer()
+        }
+    }
+
+    private func commitSnoozeEdit(_ edited: SnoozeSettings, enableOnDone: Bool) {
+        guard !isTerminating else { return }
+        var updated = edited.normalized()
+        if enableOnDone {
+            guard updated.hasEffectiveWindow else { return }
+            updated.enabled = true
+            override = nil
+        } else {
+            updated.enabled = settings.enabled
+        }
+        settings = updated
+        persistSnooze()
+        if settings.enabled {
+            reconcile(restartNudgeTimer: false, userInitiated: false)
+        }
+    }
+
+    private func disableSnooze() {
+        let wasNudging = isActive
+        settings.enabled = false
+        override = nil
+        persistSnooze()
+        cancelBoundaryTimer()
+        displayAssertion.release()
+        if wasNudging {
+            appliedActivity = .nudge
+        } else {
+            stopTimer()
+            isActive = false
+            appliedActivity = .idle
+        }
+    }
+
+    private func persistSnooze() {
+        settings.save(to: .standard)
     }
 
     private func resumeClosedLidIfNeeded() {
@@ -173,11 +373,119 @@ final class AppState {
         }
     }
 
-    func updateInterval(_ minutes: Int) {
-        intervalMinutes = minutes
-        if isActive {
+    private func handleWake() {
+        guard !isTerminating else { return }
+        if settings.enabled {
+            reconcile(restartNudgeTimer: true, userInitiated: false)
+        } else if isActive {
             restartTimer()
         }
+    }
+
+    private func observeClockChanges() {
+        let names = [
+            Notification.Name("NSSystemClockDidChangeNotification"),
+            Notification.Name("NSSystemTimeZoneDidChangeNotification"),
+        ]
+        for name in names {
+            notificationObservers.append(
+                NotificationCenter.default.addObserver(
+                    forName: name,
+                    object: nil,
+                    queue: .main
+                ) { [weak self] _ in
+                    guard let self, self.settings.enabled, !self.isTerminating else { return }
+                    self.reconcile(restartNudgeTimer: false, userInitiated: false)
+                }
+            )
+        }
+    }
+
+    private func reconcile(restartNudgeTimer: Bool, userInitiated: Bool, now: Date = Date()) {
+        guard !isTerminating, settings.enabled else { return }
+        let trusted = AccessibilityHelper.isTrusted()
+        hasAccessibility = trusted
+        let decision = SnoozeSchedule.decide(
+            now: now,
+            calendar: .current,
+            settings: settings,
+            override: override
+        )
+        override = decision.override
+        lastDecision = decision
+
+        var activity = decision.activity
+        if activity == .nudge && !trusted {
+            activity = .idle
+            if userInitiated {
+                AccessibilityHelper.requestAccess()
+                startAccessibilityPolling()
+            }
+        }
+        apply(activity, restartNudgeTimer: restartNudgeTimer)
+        scheduleBoundary(nextChange: decision.nextChange, now: now)
+    }
+
+    private func apply(_ activity: Activity, restartNudgeTimer: Bool) {
+        if activity == appliedActivity {
+            if activity == .nudge && restartNudgeTimer {
+                startNudging(restartTimer: true)
+            } else if activity == .display && !displayAssertion.isHeld {
+                displayAssertion.acquire()
+            }
+            return
+        }
+        switch activity {
+        case .nudge:
+            displayAssertion.release()
+            startNudging(restartTimer: true)
+        case .display:
+            stopTimer()
+            isActive = false
+            displayAssertion.acquire()
+        case .idle:
+            stopTimer()
+            isActive = false
+            displayAssertion.release()
+        }
+        appliedActivity = activity
+    }
+
+    private func startNudging(restartTimer: Bool) {
+        hasAccessibility = true
+        let needsTimer = restartTimer || !isActive || timer == nil
+        isActive = true
+        if needsTimer {
+            startTimer()
+        }
+    }
+
+    private func scheduleBoundary(nextChange: Date?, now: Date) {
+        boundaryTimer?.cancel()
+        boundaryTimer = nil
+        guard settings.enabled else { return }
+        let fire: Date
+        if let scheduled = SnoozeSchedule.timerFireDate(now: now, nextChange: nextChange) {
+            fire = scheduled
+        } else if let nextChange, nextChange <= now {
+            fire = now.addingTimeInterval(1)
+        } else {
+            return
+        }
+        let delay = max(fire.timeIntervalSince(now), 0.05)
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        let milliseconds = max(Int(delay * 1_000), 50)
+        timer.schedule(wallDeadline: .now() + .milliseconds(milliseconds), leeway: .seconds(1))
+        timer.setEventHandler { [weak self] in
+            self?.reconcile(restartNudgeTimer: false, userInitiated: false)
+        }
+        timer.resume()
+        boundaryTimer = timer
+    }
+
+    private func cancelBoundaryTimer() {
+        boundaryTimer?.cancel()
+        boundaryTimer = nil
     }
 
     private func startTimer() {
@@ -191,7 +499,6 @@ final class AppState {
         source.resume()
         timer = source
 
-        // Perform an initial nudge immediately
         timerQueue.async { [weak self] in
             self?.performNudge()
         }
@@ -214,5 +521,11 @@ final class AppState {
                 self.lastNudgeTime = Date()
             }
         }
+    }
+
+    private static func shortTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }

@@ -8,10 +8,13 @@ Inspired by utilities like Caffeine, Hyperactive is designed for moments when yo
 
 Hyperactive sits in your menu bar and moves the mouse cursor by a few pixels (±2-4px) at a configurable interval, then moves it back. The movement is intentionally small so it helps keep the system active without disrupting normal mouse usage.
 
+**Snooze** limits that to the hours you choose. Each weekday has its own windows. Inside a window the pointer moves as usual. Outside them, Hyperactive either does nothing or keeps the display awake without moving the pointer. Snooze is off until you turn it on, so the app behaves as before until then.
+
 ## Features
 
 - **One-click toggle** from the menu bar
-- **Visual indicator** — icon changes when active (`cursorarrow.motionlines` vs `cursorarrow`)
+- **Snooze** — per-weekday active hours, with an optional weekdays-only switch. Outside those hours, stop completely or keep the display on without moving the pointer
+- **Visual indicator** — icon changes when nudging (`cursorarrow.motionlines`), keeping the display on (`display`), snoozed (`moon.zzz`), or off (`cursorarrow`)
 - **Configurable interval** — 1, 2, 5, 10, 15, or 30 minutes
 - **Nudge counter** — see how many nudges have occurred and when
 - **Launch at Login** — start automatically with macOS
@@ -56,6 +59,9 @@ make release
 
 # Or open in Xcode
 make open
+
+# Schedule unit tests
+make test
 ```
 
 The built app will be in `build/Build/Products/Release/Hyperactive.app`.
@@ -131,13 +137,24 @@ sudo pmset -a disablesleep 0
 4. To change the interval: **Interval >** submenu
 5. Click **Stop** to deactivate
 6. To keep a local job running with the lid shut and no external display, turn on **Keep Awake with Lid Closed** before you close the lid, then enter your password
+7. To run only during certain hours, open **Snooze** and choose **Edit Schedule…**. Each weekday has its own hours. **Weekdays Only** uses the outside mode all Saturday and Sunday, and keeps any weekend hours for when you turn that off. **Outside Hours** is **Off** (Hyperactive does nothing) or **Screen Only** (the display stays on, the pointer stays still)
+8. With Snooze on, **Start** during a gap nudges until the next window or midnight, whichever comes first. **Stop** during a window stays idle until that window ends. The status line names the time
+
+Snooze does not change **Keep Awake with Lid Closed**. While that is on, the Mac does not sleep, including outside active hours.
 
 ## Menu
 
 ```
 Start / Stop              ⌘S
 ─────────────────────────────
-Active — 12 nudges (last: 2:34 PM)
+Nudging until 2:00 PM — 12 nudges (last: 2:34 PM)
+─────────────────────────────
+Snooze ▸
+  Turn Snooze Off
+  Outside Hours: Off            ✓
+  Outside Hours: Screen Only
+  Weekdays Only
+  Edit Schedule…
 ─────────────────────────────
 Interval ▸ [1, 2, 5✓, 10, 15, 30 min]
 ─────────────────────────────
