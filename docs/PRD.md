@@ -40,17 +40,26 @@ macOS users who want a lightweight, visible, and configurable way to keep their 
 - Resume after system wake
 
 ### Closed-lid keep awake
-- Menu toggle, independent of Start/Stop
+- Menu toggle, independent of Start/Stop and of Snooze
 - Arms `pmset -a disablesleep` (administrator password) before the lid closes
 - Holds a `PreventUserIdleDisplaySleep` assertion so the screen stays on while the lid is open
 - Restores normal sleep when the toggle is turned off or the app quits
 - Re-arms a saved preference on next launch, and restores sleep if a previous session died while the setting was armed
 - Shows whether an external display is connected, plus a heat warning
 
+### Snooze
+- Off until the user turns it on. With it off, Start/Stop behaves as before
+- One window list per weekday, edited on its own. Windows stay inside a single local day
+- **Weekdays only** uses the outside mode all Saturday and Sunday, and keeps weekend hours for when the flag is turned off
+- Outside the windows: **Off** (no nudge, no display assertion) or **Screen only** (a separate display-sleep assertion, pointer stays still)
+- Manual Start during a gap nudges until the next window or local midnight, whichever comes first
+- Manual Stop inside a window stays idle until that window ends
+- Recomputes on launch, wake, clock change, and time zone change. The boundary timer is never more than 15 minutes out
+- Does not arm or disarm closed-lid keep-awake
+
 ### Non-Goals (v1.0)
 - Windows/Linux support
 - Custom nudge distance
-- Scheduling (active hours)
 - Keystroke simulation
 - Auto-update mechanism
 

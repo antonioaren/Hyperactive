@@ -52,6 +52,9 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
+      - name: Test
+        run: make test
+
       - name: Build
         env:
           VERSION: ${{ steps.version.outputs.version }}
