@@ -89,10 +89,70 @@ enum OutsideMode: String, Codable, Equatable {
     case screenOnly
 }
 
+/// Nudge spacing shown in the Interval menu. Only these values are valid.
+/// `UserDefaults.integer` is 0 when the key is missing, and 0 is not a choice,
+/// so a missing or unreadable value is 5 minutes. A 0-minute timer does not
+/// repeat, which leaves the screen idle while the icon still says active.
+enum NudgeInterval {
+    static let choices = [1, 2, 5, 10, 15, 30]
+    static let defaultMinutes = 5
+    static let storageKey = "nudgeIntervalMinutes"
+    /// Older builds may have written the number under one of these names.
+    static let legacyKeys = ["intervalMinutes", "interval"]
+
+    static func resolved(_ minutes: Int?) -> Int {
+        guard let minutes, choices.contains(minutes) else { return defaultMinutes }
+        return minutes
+    }
+
+    static func seconds(for minutes: Int) -> TimeInterval {
+        TimeInterval(resolved(minutes) * 60)
+    }
+
+    static func load(from defaults: UserDefaults) -> Int {
+        if defaults.object(forKey: storageKey) != nil {
+            return resolved(storedMinutes(in: defaults, key: storageKey))
+        }
+        for key in legacyKeys where defaults.object(forKey: key) != nil {
+            return resolved(storedMinutes(in: defaults, key: key))
+        }
+        return defaultMinutes
+    }
+
+    static func save(_ minutes: Int, to defaults: UserDefaults) {
+        defaults.set(resolved(minutes), forKey: storageKey)
+    }
+
+    private static func storedMinutes(in defaults: UserDefaults, key: String) -> Int? {
+        guard let object = defaults.object(forKey: key) else { return nil }
+        if let number = object as? NSNumber {
+            return number.intValue
+        }
+        if let text = object as? String {
+            return Int(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return nil
+    }
+}
+
 enum Activity: Equatable {
     case nudge
     case display
     case idle
+}
+
+/// What the app should actually do for a schedule activity.
+///
+/// `presentAsActive` is the menu-bar icon. It stays false when Accessibility
+/// is missing, so the icon cannot say the pointer is moving when it is not.
+/// `holdDisplayAssertion` keeps the screensaver from starting. Inside an
+/// active window that is in addition to nudges, because a nudge that macOS
+/// drops does not reset the idle timer.
+struct ActivityEffect: Equatable {
+    var runNudges: Bool
+    var holdDisplayAssertion: Bool
+    var presentAsActive: Bool
+    var needsAccessibility: Bool
 }
 
 /// A manual Start or Stop while Snooze is on.
@@ -333,6 +393,47 @@ enum SnoozeSchedule {
     static func timerFireDate(now: Date, nextChange: Date?) -> Date? {
         guard let nextChange, nextChange > now else { return nil }
         return min(nextChange, now.addingTimeInterval(boundaryHop))
+    }
+
+    static func effect(for activity: Activity, accessibilityTrusted: Bool) -> ActivityEffect {
+        switch activity {
+        case .nudge:
+            guard accessibilityTrusted else {
+                return ActivityEffect(
+                    runNudges: false,
+                    holdDisplayAssertion: false,
+                    presentAsActive: false,
+                    needsAccessibility: true
+                )
+            }
+            return ActivityEffect(
+                runNudges: true,
+                holdDisplayAssertion: true,
+                presentAsActive: true,
+                needsAccessibility: false
+            )
+        case .display:
+            return ActivityEffect(
+                runNudges: false,
+                holdDisplayAssertion: true,
+                presentAsActive: false,
+                needsAccessibility: false
+            )
+        case .idle:
+            return ActivityEffect(
+                runNudges: false,
+                holdDisplayAssertion: false,
+                presentAsActive: false,
+                needsAccessibility: false
+            )
+        }
+    }
+
+    /// A reconcile that is only checking the clock must not restart a nudge
+    /// timer that is already running. Wake and an interval change pass
+    /// `restartRequested: true`.
+    static func shouldRestartNudgeTimer(isRunning: Bool, restartRequested: Bool) -> Bool {
+        restartRequested || !isRunning
     }
 
     static func symbol(

@@ -360,6 +360,116 @@ final class SnoozeScheduleTests: XCTestCase {
         )
     }
 
+    func testMissingOrInvalidIntervalFallsBackToFiveMinutes() {
+        XCTAssertEqual(NudgeInterval.resolved(nil), 5)
+        XCTAssertEqual(NudgeInterval.resolved(0), 5)
+        XCTAssertEqual(NudgeInterval.resolved(7), 5)
+        XCTAssertEqual(NudgeInterval.resolved(-3), 5)
+        XCTAssertEqual(NudgeInterval.resolved(5), 5)
+        XCTAssertEqual(NudgeInterval.resolved(30), 30)
+        for choice in NudgeInterval.choices {
+            XCTAssertEqual(NudgeInterval.resolved(choice), choice)
+            XCTAssertTrue(NudgeInterval.choices.contains(NudgeInterval.resolved(choice)))
+        }
+        XCTAssertEqual(NudgeInterval.seconds(for: 0), 5 * 60)
+        XCTAssertEqual(NudgeInterval.seconds(for: 7), 5 * 60)
+        XCTAssertEqual(NudgeInterval.seconds(for: 1), 60)
+        XCTAssertGreaterThan(NudgeInterval.seconds(for: 0), 0)
+
+        let suite = "interval-tests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        XCTAssertEqual(NudgeInterval.load(from: defaults), 5)
+
+        defaults.set(0, forKey: NudgeInterval.storageKey)
+        XCTAssertEqual(NudgeInterval.load(from: defaults), 5)
+
+        defaults.set(4, forKey: NudgeInterval.storageKey)
+        XCTAssertEqual(NudgeInterval.load(from: defaults), 5)
+
+        defaults.set("fast", forKey: NudgeInterval.storageKey)
+        XCTAssertEqual(NudgeInterval.load(from: defaults), 5)
+
+        defaults.set("15", forKey: NudgeInterval.storageKey)
+        XCTAssertEqual(NudgeInterval.load(from: defaults), 15)
+
+        defaults.removeObject(forKey: NudgeInterval.storageKey)
+        defaults.set(0, forKey: "intervalMinutes")
+        XCTAssertEqual(NudgeInterval.load(from: defaults), 5)
+
+        defaults.set(10, forKey: "interval")
+        defaults.removeObject(forKey: "intervalMinutes")
+        XCTAssertEqual(NudgeInterval.load(from: defaults), 10)
+
+        NudgeInterval.save(0, to: defaults)
+        XCTAssertEqual(defaults.integer(forKey: NudgeInterval.storageKey), 5)
+        XCTAssertTrue(NudgeInterval.choices.contains(NudgeInterval.load(from: defaults)))
+    }
+
+    func testInsideAnActiveWindowKeepsTheDisplayAwakeAndNudgesWhenTrusted() {
+        let settings = makeSettings([.friday: [(8 * 60, 14 * 60)]])
+        let now = date(2026, 3, 6, 9, 0)
+        let decision = decide(settings, at: now)
+        XCTAssertEqual(decision.activity, .nudge)
+
+        let effect = SnoozeSchedule.effect(for: decision.activity, accessibilityTrusted: true)
+        XCTAssertTrue(effect.runNudges)
+        XCTAssertTrue(effect.holdDisplayAssertion)
+        XCTAssertTrue(effect.presentAsActive)
+        XCTAssertFalse(effect.needsAccessibility)
+        XCTAssertEqual(
+            SnoozeSchedule.symbol(
+                nudging: effect.presentAsActive,
+                snoozeEnabled: true,
+                showingDisplay: false,
+                paused: false,
+                blocked: effect.needsAccessibility
+            ),
+            "cursorarrow.motionlines"
+        )
+    }
+
+    func testMissingAccessibilityDoesNotLookActive() {
+        let effect = SnoozeSchedule.effect(for: .nudge, accessibilityTrusted: false)
+        XCTAssertFalse(effect.runNudges)
+        XCTAssertFalse(effect.holdDisplayAssertion)
+        XCTAssertFalse(effect.presentAsActive)
+        XCTAssertTrue(effect.needsAccessibility)
+        XCTAssertEqual(
+            SnoozeSchedule.symbol(
+                nudging: effect.presentAsActive,
+                snoozeEnabled: true,
+                showingDisplay: false,
+                paused: false,
+                blocked: effect.needsAccessibility
+            ),
+            "cursorarrow"
+        )
+    }
+
+    func testScreenOnlyHoldsTheDisplayWithoutNudging() {
+        let effect = SnoozeSchedule.effect(for: .display, accessibilityTrusted: false)
+        XCTAssertFalse(effect.runNudges)
+        XCTAssertTrue(effect.holdDisplayAssertion)
+        XCTAssertFalse(effect.presentAsActive)
+        XCTAssertFalse(effect.needsAccessibility)
+    }
+
+    func testIdleReleasesTheDisplayAssertion() {
+        let effect = SnoozeSchedule.effect(for: .idle, accessibilityTrusted: true)
+        XCTAssertFalse(effect.runNudges)
+        XCTAssertFalse(effect.holdDisplayAssertion)
+        XCTAssertFalse(effect.presentAsActive)
+        XCTAssertFalse(effect.needsAccessibility)
+    }
+
+    func testBoundaryRefreshDoesNotRestartARunningNudgeTimer() {
+        XCTAssertFalse(SnoozeSchedule.shouldRestartNudgeTimer(isRunning: true, restartRequested: false))
+        XCTAssertTrue(SnoozeSchedule.shouldRestartNudgeTimer(isRunning: false, restartRequested: false))
+        XCTAssertTrue(SnoozeSchedule.shouldRestartNudgeTimer(isRunning: true, restartRequested: true))
+    }
+
     func testSymbols() {
         XCTAssertEqual(
             SnoozeSchedule.symbol(nudging: true, snoozeEnabled: true, showingDisplay: false, paused: false, blocked: false),
