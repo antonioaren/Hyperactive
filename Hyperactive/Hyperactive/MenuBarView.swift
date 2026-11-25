@@ -30,10 +30,10 @@ struct MenuBarView: View {
         }
 
         if !appState.hasAccessibility {
-            Text("Accessibility: not granted")
+            Text(AccessibilityHelper.missingPermissionTitle)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("Toggle OFF then ON after rebuild")
+            Text(AccessibilityHelper.missingPermissionInstructions)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
             Button("Open Accessibility Settings\u{2026}") {

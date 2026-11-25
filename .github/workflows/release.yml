@@ -19,10 +19,14 @@ jobs:
     runs-on: macos-15
     env:
       APP_PATH: build/Build/Products/Release/Hyperactive.app
-      # Optional. When set, the app is signed with Developer ID (and notarized
-      # if the Apple ID secrets are also set). Otherwise it is ad-hoc signed.
+      # Optional. Developer ID when MACOS_CERTIFICATE is set (and notarized if
+      # the Apple ID secrets are also set). Otherwise a stable self-signed
+      # identity when HYPERACTIVE_SIGNING_CERTIFICATE is set, so Accessibility
+      # survives updates. With neither secret the Xcode build stays ad-hoc.
       MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
       MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+      HYPERACTIVE_SIGNING_CERTIFICATE: ${{ secrets.HYPERACTIVE_SIGNING_CERTIFICATE }}
+      HYPERACTIVE_SIGNING_CERTIFICATE_PWD: ${{ secrets.HYPERACTIVE_SIGNING_CERTIFICATE_PWD }}
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
@@ -60,29 +64,10 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: make release VERSION="$VERSION" BUILD_NUMBER="$GITHUB_RUN_NUMBER"
 
-      - name: Sign with Developer ID
-        if: env.MACOS_CERTIFICATE != ''
+      - name: Sign release
         env:
           KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
-        run: |
-          keychain="$RUNNER_TEMP/signing.keychain-db"
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
-          security set-keychain-settings -lut 21600 "$keychain"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
-          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
-          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
-          rm -f "$RUNNER_TEMP/certificate.p12"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
-          # shellcheck disable=SC2046
-          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
-          identity="$(security find-identity -v -p codesigning "$keychain" | grep -o '"Developer ID Application: [^"]*"' | head -n 1 | tr -d '"')"
-          if [[ -z "$identity" ]]; then
-            echo "No 'Developer ID Application' identity found in MACOS_CERTIFICATE" >&2
-            exit 1
-          fi
-          codesign --force --options runtime --timestamp \
-            --entitlements Hyperactive/Hyperactive/Hyperactive.entitlements \
-            --sign "$identity" "$APP_PATH"
+        run: scripts/sign-release.sh
 
       - name: Notarize
         if: env.MACOS_CERTIFICATE != '' && env.APPLE_ID != ''
@@ -139,5 +124,5 @@ jobs:
             --latest
 
       - name: Remove signing keychain
-        if: always() && env.MACOS_CERTIFICATE != ''
+        if: always() && (env.MACOS_CERTIFICATE != '' || env.HYPERACTIVE_SIGNING_CERTIFICATE != '')
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true

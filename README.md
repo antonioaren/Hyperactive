@@ -45,7 +45,7 @@ The menu shows the installed version (`Version X.Y.Z (build N)`). Hyperactive ch
 
 - Run Hyperactive from `/Applications`. Updating does not work while it runs from the DMG or the Downloads folder.
 - If the app folder is not writable by your user, macOS asks for an administrator password.
-- Release builds are ad-hoc signed unless Developer ID signing is configured (see below), so macOS may ask you to grant Accessibility access again after an update.
+- Release builds are ad-hoc signed unless a stable signing certificate is configured (see below). An ad-hoc signature changes every version, so macOS asks for Accessibility access again after an update.
 
 ### Build from Source
 
@@ -111,15 +111,52 @@ By default the app is ad-hoc signed. To sign with a Developer ID certificate and
 
 With only the certificate secrets the app is signed but not notarized. A stable Developer ID signature also keeps the Accessibility permission across updates.
 
+### Optional: stable self-signed certificate
+
+Use this when you do not have an Apple Developer account and you still want Accessibility to survive updates. macOS ties an ad-hoc signature to that build's cdhash, so each release looks like a different app. A certificate you create once and reuse has a constant designated requirement, and the Accessibility grant stays with that requirement.
+
+Trade-offs:
+
+| | Developer ID + notarization | Stable self-signed certificate | Ad-hoc (no secret) |
+| --- | --- | --- | --- |
+| Accessibility across updates | Kept | Kept, after one approval of this certificate | Asked again every update |
+| Gatekeeper | Quiet after notarization | Still warns. Right-click the app and choose Open the first time | Still warns |
+| Apple Developer account | Required | Not required | Not required |
+| What you must keep | The Developer ID `.p12` | The same self-signed `.p12`. A new certificate starts the problem over | Nothing |
+
+Developer ID wins when `MACOS_CERTIFICATE` is set. Otherwise CI uses `HYPERACTIVE_SIGNING_CERTIFICATE` if that secret is set. With neither secret, the build stays ad-hoc.
+
+Create the certificate once, on any machine with OpenSSL, and do not commit the `.p12`:
+
+```bash
+HYPERACTIVE_SIGNING_CERTIFICATE_PWD='choose-a-password' \
+  scripts/create-signing-certificate.sh
+```
+
+Add these repository secrets (Settings > Secrets and variables > Actions):
+
+| Secret | Value |
+| --- | --- |
+| `HYPERACTIVE_SIGNING_CERTIFICATE` | Base64 printed by the script |
+| `HYPERACTIVE_SIGNING_CERTIFICATE_PWD` | The password you set |
+
+The first release signed with that certificate still needs Accessibility removed and added once. Later releases signed with the same certificate keep the grant. Confirm the requirement did not change with `codesign -d -r- /Applications/Hyperactive.app`.
+
 ## Permissions
 
-Hyperactive needs **Accessibility** permission to move the mouse cursor.
+Hyperactive needs **Accessibility** permission to move the mouse cursor. The bundle identifier is `com.hyperactive.app`.
 
 On first launch (or when you click "Start"), macOS will prompt you to grant access:
 
-**System Settings > Privacy & Security > Accessibility > Hyperactive** — toggle ON.
+**System Settings > Privacy & Security > Accessibility**
 
-If you miss the prompt, click **"Grant Accessibility Access..."** in the app's menu.
+If the switch is already on and macOS still asks, the grant is for an older signature. Select Hyperactive, click the minus button to remove it, then add Hyperactive again. Turning the switch off and on is not enough. You can also clear the stale entry and add the app again:
+
+```bash
+tccutil reset Accessibility com.hyperactive.app
+```
+
+The menu item **Open Accessibility Settings…** opens that pane. After you grant access, Hyperactive notices within a couple of seconds. You do not need to quit it.
 
 **Keep Awake with Lid Closed** also needs an administrator password. macOS sleeps a laptop immediately when the lid closes and no external display is attached; cursor nudges cannot block that. The menu item runs `pmset -a disablesleep` and restores normal sleep when you turn it off or quit. The built-in panel turns off with the lid. The Mac, and anything running on it, stays awake.
 

@@ -57,7 +57,7 @@ macOS users who want a lightweight, visible, and configurable way to keep their 
 - Recomputes on launch, wake, clock change, and time zone change. The boundary timer is never more than 15 minutes out
 - Inside an active window, a display-sleep assertion stays held so the screensaver cannot start between nudges
 - The nudge interval is one of 1, 2, 5, 10, 15, or 30 minutes. A missing or invalid saved value is 5, and that choice is shown in the menu
-- If Accessibility permission is missing, the menu says so and the icon does not show the active state
+- If Accessibility permission is missing, the menu says so and the icon does not show the active state. The menu tells the user to remove Hyperactive with the minus button and add it again, because toggling the switch does not replace a stale grant. Trust is rechecked every few seconds and when the app becomes active
 - Does not arm or disarm closed-lid keep-awake
 
 ### Non-Goals (v1.0)
