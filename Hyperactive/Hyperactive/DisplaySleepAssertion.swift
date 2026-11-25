@@ -1,7 +1,7 @@
 import Foundation
 import IOKit.pwr_mgt
 
-/// Keeps the display on while Snooze is in Screen only mode.
+/// Keeps the display on while Snooze is nudging or in Screen only mode.
 ///
 /// This is a separate assertion from the one closed-lid keep-awake holds.
 /// Releasing it leaves that other assertion, and `pmset disablesleep`, alone.
@@ -17,7 +17,7 @@ final class DisplaySleepAssertion {
         let result = IOPMAssertionCreateWithName(
             kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
             IOPMAssertionLevel(kIOPMAssertionLevelOn),
-            "Hyperactive keeps the display on outside active hours" as CFString,
+            "Hyperactive keeps the display awake" as CFString,
             &newID
         )
         guard result == kIOReturnSuccess else {

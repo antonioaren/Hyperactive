@@ -93,6 +93,8 @@ final class AppState {
 
     init() {
         settings = SnoozeSettings.load()
+        intervalMinutes = NudgeInterval.load(from: .standard)
+        NudgeInterval.save(intervalMinutes, to: .standard)
         hasAccessibility = AccessibilityHelper.isTrusted()
         launchAtLogin = LaunchAtLoginHelper.isEnabled
         hasExternalDisplay = closedLidKeepAwake.hasExternalDisplay
@@ -176,16 +178,16 @@ final class AppState {
     }
 
     func start() {
-        guard AccessibilityHelper.isTrusted() else {
-            hasAccessibility = false
+        let effect = SnoozeSchedule.effect(for: .nudge, accessibilityTrusted: AccessibilityHelper.isTrusted())
+        hasAccessibility = !effect.needsAccessibility
+        guard effect.runNudges else {
             AccessibilityHelper.requestAccess()
             startAccessibilityPolling()
             return
         }
-        hasAccessibility = true
         isActive = true
         appliedActivity = .nudge
-        displayAssertion.release()
+        displayAssertion.acquire()
         cancelBoundaryTimer()
         startTimer()
     }
@@ -198,7 +200,7 @@ final class AppState {
         poll.schedule(deadline: .now() + 1, repeating: 2)
         poll.setEventHandler { [weak self] in
             guard let self else { return }
-            if AccessibilityHelper.isTrusted() {
+                if AccessibilityHelper.isTrusted() {
                 self.accessibilityPollTimer?.cancel()
                 self.accessibilityPollTimer = nil
                 self.hasAccessibility = true
@@ -207,6 +209,7 @@ final class AppState {
                 } else {
                     self.isActive = true
                     self.appliedActivity = .nudge
+                    self.displayAssertion.acquire()
                     self.startTimer()
                 }
             }
@@ -321,7 +324,8 @@ final class AppState {
     }
 
     func updateInterval(_ minutes: Int) {
-        intervalMinutes = minutes
+        intervalMinutes = NudgeInterval.resolved(minutes)
+        NudgeInterval.save(intervalMinutes, to: .standard)
         if isActive {
             restartTimer()
         }
@@ -350,10 +354,11 @@ final class AppState {
         override = nil
         persistSnooze()
         cancelBoundaryTimer()
-        displayAssertion.release()
         if wasNudging {
             appliedActivity = .nudge
+            displayAssertion.acquire()
         } else {
+            displayAssertion.release()
             stopTimer()
             isActive = false
             appliedActivity = .idle
@@ -403,8 +408,6 @@ final class AppState {
 
     private func reconcile(restartNudgeTimer: Bool, userInitiated: Bool, now: Date = Date()) {
         guard !isTerminating, settings.enabled else { return }
-        let trusted = AccessibilityHelper.isTrusted()
-        hasAccessibility = trusted
         let decision = SnoozeSchedule.decide(
             now: now,
             calendar: .current,
@@ -413,49 +416,41 @@ final class AppState {
         )
         override = decision.override
         lastDecision = decision
-
-        var activity = decision.activity
-        if activity == .nudge && !trusted {
-            activity = .idle
-            if userInitiated {
-                AccessibilityHelper.requestAccess()
-                startAccessibilityPolling()
-            }
-        }
-        apply(activity, restartNudgeTimer: restartNudgeTimer)
+        apply(decision.activity, restartNudgeTimer: restartNudgeTimer, userInitiated: userInitiated)
         scheduleBoundary(nextChange: decision.nextChange, now: now)
     }
 
-    private func apply(_ activity: Activity, restartNudgeTimer: Bool) {
-        if activity == appliedActivity {
-            if activity == .nudge && restartNudgeTimer {
-                startNudging(restartTimer: true)
-            } else if activity == .display && !displayAssertion.isHeld {
-                displayAssertion.acquire()
-            }
+    private func apply(_ activity: Activity, restartNudgeTimer: Bool, userInitiated: Bool) {
+        let trusted = AccessibilityHelper.isTrusted()
+        hasAccessibility = trusted
+        let effect = SnoozeSchedule.effect(for: activity, accessibilityTrusted: trusted)
+        if effect.needsAccessibility && userInitiated {
+            AccessibilityHelper.requestAccess()
+            startAccessibilityPolling()
+        }
+
+        if effect.runNudges {
+            displayAssertion.acquire()
+            startNudging(restartTimer: restartNudgeTimer)
+            appliedActivity = .nudge
             return
         }
-        switch activity {
-        case .nudge:
-            displayAssertion.release()
-            startNudging(restartTimer: true)
-        case .display:
-            stopTimer()
-            isActive = false
+
+        stopTimer()
+        isActive = false
+        if effect.holdDisplayAssertion {
             displayAssertion.acquire()
-        case .idle:
-            stopTimer()
-            isActive = false
+            appliedActivity = .display
+        } else {
             displayAssertion.release()
+            appliedActivity = .idle
         }
-        appliedActivity = activity
     }
 
     private func startNudging(restartTimer: Bool) {
-        hasAccessibility = true
-        let needsTimer = restartTimer || !isActive || timer == nil
+        let running = isActive && timer != nil
         isActive = true
-        if needsTimer {
+        if SnoozeSchedule.shouldRestartNudgeTimer(isRunning: running, restartRequested: restartTimer) {
             startTimer()
         }
     }
@@ -491,7 +486,7 @@ final class AppState {
     private func startTimer() {
         stopTimer()
         let source = DispatchSource.makeTimerSource(queue: timerQueue)
-        let seconds = Double(intervalMinutes) * 60.0
+        let seconds = NudgeInterval.seconds(for: intervalMinutes)
         source.schedule(deadline: .now() + seconds, repeating: seconds)
         source.setEventHandler { [weak self] in
             self?.performNudge()
@@ -514,6 +509,18 @@ final class AppState {
     }
 
     private func performNudge() {
+        guard AccessibilityHelper.isTrusted() else {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isTerminating else { return }
+                self.hasAccessibility = false
+                if self.settings.enabled {
+                    self.reconcile(restartNudgeTimer: false, userInitiated: false)
+                } else {
+                    self.stop()
+                }
+            }
+            return
+        }
         let success = MouseNudger.nudge()
         DispatchQueue.main.async {
             if success {

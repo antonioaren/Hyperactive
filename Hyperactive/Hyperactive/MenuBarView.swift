@@ -4,8 +4,6 @@ struct MenuBarView: View {
     @Bindable var appState: AppState
     var updateChecker: UpdateChecker
 
-    private static let intervals = [1, 2, 5, 10, 15, 30]
-
     var body: some View {
         Button(appState.isActive ? "Stop" : "Start") {
             appState.toggle()
@@ -86,18 +84,12 @@ struct MenuBarView: View {
 
         Divider()
 
-        Menu("Interval") {
-            ForEach(Self.intervals, id: \.self) { minutes in
-                Button {
-                    appState.updateInterval(minutes)
-                } label: {
-                    HStack {
-                        Text("\(minutes) min")
-                        if appState.intervalMinutes == minutes {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
+        Picker("Interval", selection: Binding(
+            get: { appState.intervalMinutes },
+            set: { appState.updateInterval($0) }
+        )) {
+            ForEach(NudgeInterval.choices, id: \.self) { minutes in
+                Text("\(minutes) min").tag(minutes)
             }
         }
 

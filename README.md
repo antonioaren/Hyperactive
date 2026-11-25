@@ -8,7 +8,7 @@ Inspired by utilities like Caffeine, Hyperactive is designed for moments when yo
 
 Hyperactive sits in your menu bar and moves the mouse cursor by a few pixels (±2-4px) at a configurable interval, then moves it back. The movement is intentionally small so it helps keep the system active without disrupting normal mouse usage.
 
-**Snooze** limits that to the hours you choose. Each weekday has its own windows. Inside a window the pointer moves as usual. Outside them, Hyperactive either does nothing or keeps the display awake without moving the pointer. Snooze is off until you turn it on, so the app behaves as before until then.
+**Snooze** limits that to the hours you choose. Each weekday has its own windows. Inside a window the pointer moves and the display stays awake. Outside them, Hyperactive either does nothing or keeps the display awake without moving the pointer. Snooze is off until you turn it on, so the app behaves as before until then. The interval is one of 1, 2, 5, 10, 15, or 30 minutes and is remembered; a missing or invalid saved value is 5 minutes.
 
 ## Features
 
