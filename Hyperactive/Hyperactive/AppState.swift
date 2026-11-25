@@ -116,6 +116,16 @@ final class AppState {
             }
         )
         observeClockChanges()
+        notificationObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: NSApplication.didBecomeActiveNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.recheckAccessibility()
+            }
+        )
+        startAccessibilityWatch()
 
         DispatchQueue.main.async { [weak self] in
             self?.resumeClosedLidIfNeeded()
@@ -135,6 +145,8 @@ final class AppState {
         }
         timer?.cancel()
         boundaryTimer?.cancel()
+        accessibilityWatch?.cancel()
+        accessibilityPollTimer?.cancel()
         displayAssertion.release()
     }
 
@@ -181,8 +193,7 @@ final class AppState {
         let effect = SnoozeSchedule.effect(for: .nudge, accessibilityTrusted: AccessibilityHelper.isTrusted())
         hasAccessibility = !effect.needsAccessibility
         guard effect.runNudges else {
-            AccessibilityHelper.requestAccess()
-            startAccessibilityPolling()
+            promptForAccessibilityOnce()
             return
         }
         isActive = true
@@ -193,6 +204,38 @@ final class AppState {
     }
 
     private var accessibilityPollTimer: DispatchSourceTimer?
+    private var accessibilityWatch: DispatchSourceTimer?
+    private var didRequestAccessibilityPrompt = false
+
+    private func promptForAccessibilityOnce() {
+        guard !didRequestAccessibilityPrompt else { return }
+        didRequestAccessibilityPrompt = true
+        AccessibilityHelper.requestAccess()
+        startAccessibilityPolling()
+    }
+
+    /// Notices a grant or a revoke without restarting. Does not show the system prompt.
+    private func startAccessibilityWatch() {
+        let watch = DispatchSource.makeTimerSource(queue: .main)
+        watch.schedule(deadline: .now() + 2, repeating: 2)
+        watch.setEventHandler { [weak self] in
+            self?.recheckAccessibility()
+        }
+        watch.resume()
+        accessibilityWatch = watch
+    }
+
+    private func recheckAccessibility() {
+        guard !isTerminating else { return }
+        let trusted = AccessibilityHelper.isTrusted()
+        guard trusted != hasAccessibility else { return }
+        hasAccessibility = trusted
+        if settings.enabled {
+            reconcile(restartNudgeTimer: false, userInitiated: false)
+        } else if !trusted && isActive {
+            stop()
+        }
+    }
 
     private func startAccessibilityPolling() {
         accessibilityPollTimer?.cancel()
@@ -270,6 +313,8 @@ final class AppState {
         cancelBoundaryTimer()
         accessibilityPollTimer?.cancel()
         accessibilityPollTimer = nil
+        accessibilityWatch?.cancel()
+        accessibilityWatch = nil
         displayAssertion.release()
         closedLidKeepAwake.disarmForTermination()
     }
@@ -425,8 +470,7 @@ final class AppState {
         hasAccessibility = trusted
         let effect = SnoozeSchedule.effect(for: activity, accessibilityTrusted: trusted)
         if effect.needsAccessibility && userInitiated {
-            AccessibilityHelper.requestAccess()
-            startAccessibilityPolling()
+            promptForAccessibilityOnce()
         }
 
         if effect.runNudges {
