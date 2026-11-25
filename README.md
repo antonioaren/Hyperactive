@@ -129,8 +129,8 @@ Developer ID wins when `MACOS_CERTIFICATE` is set. Otherwise CI uses `HYPERACTIV
 Create the certificate once, on any machine with OpenSSL, and do not commit the `.p12`:
 
 ```bash
-HYPERACTIVE_SIGNING_CERTIFICATE_PWD='choose-a-password' \
-  scripts/create-signing-certificate.sh
+export HYPERACTIVE_SIGNING_CERTIFICATE_PWD
+scripts/create-signing-certificate.sh
 ```
 
 Add these repository secrets (Settings > Secrets and variables > Actions):

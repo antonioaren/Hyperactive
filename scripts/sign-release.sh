@@ -19,7 +19,7 @@ if [[ -z "${MACOS_CERTIFICATE:-}" && -z "${HYPERACTIVE_SIGNING_CERTIFICATE:-}" ]
 fi
 
 keychain="${RUNNER_TEMP:-/tmp}/signing.keychain-db"
-keychain_password="${KEYCHAIN_PASSWORD:?Set KEYCHAIN_PASSWORD}"
+: "${KEYCHAIN_PASSWORD:?}"
 p12=""
 
 cleanup() {
@@ -30,25 +30,25 @@ cleanup() {
 }
 trap cleanup EXIT
 
-security create-keychain -p "$keychain_password" "$keychain"
+security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
 security set-keychain-settings -lut 21600 "$keychain"
-security unlock-keychain -p "$keychain_password" "$keychain"
+security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
 
 p12="$(mktemp)"
 if [[ -n "${MACOS_CERTIFICATE:-}" ]]; then
   mode="Developer ID"
   printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$p12"
-  import_password="${MACOS_CERTIFICATE_PWD:?Set MACOS_CERTIFICATE_PWD}"
+  : "${MACOS_CERTIFICATE_PWD:?}"
+  security import "$p12" -k "$keychain" -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
 else
   mode="self-signed"
   printf '%s' "$HYPERACTIVE_SIGNING_CERTIFICATE" | base64 --decode > "$p12"
-  import_password="${HYPERACTIVE_SIGNING_CERTIFICATE_PWD:?Set HYPERACTIVE_SIGNING_CERTIFICATE_PWD}"
+  : "${HYPERACTIVE_SIGNING_CERTIFICATE_PWD:?}"
+  security import "$p12" -k "$keychain" -P "$HYPERACTIVE_SIGNING_CERTIFICATE_PWD" -T /usr/bin/codesign
 fi
-
-security import "$p12" -k "$keychain" -P "$import_password" -T /usr/bin/codesign
 rm -f "$p12"
 p12=""
-security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain"
+security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
 # shellcheck disable=SC2046
 security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
 

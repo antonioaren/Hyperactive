@@ -9,14 +9,14 @@
 # designated requirement, and macOS will forget the Accessibility grant.
 #
 # Usage:
-#   HYPERACTIVE_SIGNING_CERTIFICATE_PWD='choose-a-password' \
-#     scripts/create-signing-certificate.sh
+#   export HYPERACTIVE_SIGNING_CERTIFICATE_PWD
+#   scripts/create-signing-certificate.sh
 set -euo pipefail
 
 name="${1:-Hyperactive Signing}"
 days="${2:-3650}"
 out="${3:-hyperactive-signing.p12}"
-password="${HYPERACTIVE_SIGNING_CERTIFICATE_PWD:?Set HYPERACTIVE_SIGNING_CERTIFICATE_PWD}"
+: "${HYPERACTIVE_SIGNING_CERTIFICATE_PWD:?}"
 
 workdir="$(mktemp -d)"
 cleanup() { rm -rf "$workdir"; }
@@ -36,7 +36,7 @@ openssl pkcs12 -export -legacy \
   -in "$workdir/cert.pem" \
   -out "$out" \
   -name "$name" \
-  -password "pass:$password"
+  -passout "pass:${HYPERACTIVE_SIGNING_CERTIFICATE_PWD}"
 
 echo "Wrote $out"
 echo
