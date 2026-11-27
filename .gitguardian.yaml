@@ -1,0 +1,13 @@
+# GitGuardian config v2.
+# https://docs.gitguardian.com/ggshield-docs/configuration
+#
+# v2 can exclude a path, or a detector for the whole repository. It cannot
+# limit one detector to one path. These two scripts are excluded so the
+# Generic Password detector is not raised on their environment-variable
+# references. No other path is listed, and no detector is disabled elsewhere.
+version: 2
+
+secret:
+  ignored_paths:
+    - scripts/sign-release.sh
+    - scripts/create-signing-certificate.sh
